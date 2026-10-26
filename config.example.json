@@ -1,0 +1,5 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-chat",
+  "api_key": "在这里填入你的密钥"
+}
