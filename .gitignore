@@ -9,3 +9,7 @@ prompt-booster
 # 编辑器
 .vscode/
 .idea/
+
+# .app 编译产物
+PromptBooster.app/Contents/MacOS/
+*.app

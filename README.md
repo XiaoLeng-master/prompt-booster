@@ -54,16 +54,16 @@
 ### macOS（3 步）
 
 ```bash
-# 1. 克隆并编译
+# 1. 克隆并编译安装（编译进 .app 包 + 签名 + 启动）
 git clone https://github.com/XiaoLeng-master/prompt-booster.git
 cd prompt-booster
-
-# 2. 运行安装脚本（编译 + 生成配置模板 + 开机自启）
 ./install.sh
 
-# 3. 编辑配置，填入密钥
+# 2. 编辑配置，填入密钥
 nano ~/.prompt-booster/config.json
 ```
+
+程序会安装到 `~/Applications/PromptBooster.app` 并自动启动。
 
 配置内容：
 
@@ -75,9 +75,11 @@ nano ~/.prompt-booster/config.json
 }
 ```
 
-**最后一步（必须）**：系统设置 → 隐私与安全性 → 辅助功能 → 把 `prompt-booster` 加进列表并打开。程序启动时也会主动弹窗提示。
+**最后一步（必须）**：系统设置 → 隐私与安全性 → 辅助功能 → 点 `+` → 按 `⌘⇧G` 输入 `~/Applications/PromptBooster.app` → 选中 → 打开开关。程序启动时也会主动弹窗提示。
 
-> ⚠️ **重要**：每次重新编译二进制后，macOS 的代码签名会变化，**之前的授权会失效**。需要在辅助功能列表里**移除旧条目 → 重新添加 → 打开**。如果发现「明明开了还是没反应」，先想到这一条。
+**开机自启（可选）**：系统设置 → 通用 → 登录项与扩展 → 登录时打开 → 点 `+` → 选择 `~/Applications/PromptBooster.app`。
+
+> ⚠️ **重要**：每次重新编译后，macOS 的代码签名会变化，**之前的授权会失效**。`install.sh` 已自动处理（重置本应用的授权记录），你只需重新添加并打开开关。如果发现「明明开了还是没反应」，先想到这一条。
 
 ### Windows（3 步）
 
@@ -153,7 +155,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 
 | 现象 | 原因与解决 |
 |---|---|
-| 按快捷键完全没反应，日志无「快捷键已触发」 | 快捷键注册失败（被占用）或进程没在跑。查日志首行；macOS `killall prompt-booster` 让 launchd 重拉 |
+| 按快捷键完全没反应，日志无「快捷键已触发」 | 快捷键注册失败（被占用）或进程没在跑。查日志首行；macOS 执行 `open -a ~/Applications/PromptBooster.app` 重启 |
 | 日志显示「选区为空」 | 辅助功能未授权，或重新编译后授权失效——移除旧条目重新添加 |
 | 日志显示「API 调用失败」 | 密钥无效 / 余额不足 / 模型名错误。先确认配置正确 |
 | 授权开关明明是开的，还是没反应 | 重编译导致签名变化、授权失效。移除条目 → 重新添加 → 打开 |
@@ -162,7 +164,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 
 ```bash
 # macOS
-./uninstall.sh            # 停止进程、移除自启
+./uninstall.sh            # 停止进程、删除 App
 rm -rf ~/.prompt-booster  # 删除配置与日志（含密钥）
 ```
 
