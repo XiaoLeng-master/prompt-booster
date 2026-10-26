@@ -66,11 +66,11 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 
 ## 快捷键
 
-默认 `Ctrl+Shift+E`。改 `PromptBooster.ahk` 顶部 `HOTKEY` 变量：
+默认 `Ctrl+Shift+E`。修改 `PromptBooster.ahk` 末尾的静态热键定义：
 `^`=Ctrl、`+`=Shift、`!`=Alt、`#`=Win。例如改成 `Alt+E`：
 
 ```autohotkey
-HOTKEY := "!e"
+!e::RunEnhance()
 ```
 
 ## 说明
