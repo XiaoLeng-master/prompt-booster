@@ -215,6 +215,24 @@ func enhanceSelectedText() {
 // MARK: - 入口
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-registerHotKey()
-print("PromptBooster 已启动，快捷键 ⌘⇧E")
+
+// 辅助功能权限检测：没授权时主动弹系统授权窗，并轮询等待授权成功后再注册快捷键。
+// 没有此权限，模拟按键会被系统静默拦截（表现为按快捷键无任何反应）。
+let promptOpt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+if AXIsProcessTrustedWithOptions(promptOpt) {
+    registerHotKey()
+    print("PromptBooster 已启动，快捷键 ⌘⇧E")
+} else {
+    print("PromptBooster：请在弹出的窗口中授予辅助功能权限（勾选 prompt-booster），授权后自动生效，无需重启。")
+    DispatchQueue.global().async {
+        while !AXIsProcessTrusted() {
+            usleep(1_000_000)
+        }
+        NSLog("[PromptBooster] 辅助功能授权成功，注册快捷键")
+        DispatchQueue.main.async {
+            registerHotKey()
+            print("PromptBooster 权限已就绪，快捷键 ⌘⇧E")
+        }
+    }
+}
 app.run()
