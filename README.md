@@ -148,7 +148,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 | 平台 | 默认 | 自定义方法 |
 |---|---|---|
 | macOS | ⌘⇧E | 改 `main.swift` 顶部 `HOTKEY_KEYCODE`（键码：E=14、K=40、P=35…）和 `HOTKEY_MODIFIERS`（`cmdKey` / `shiftKey` / `optionKey` / `controlKey` 组合），重新 `./install.sh` |
-| Windows | Ctrl+Shift+E | 改 `PromptBooster.ahk` 顶部 `HOTKEY`：`^`=Ctrl、`+`=Shift、`!`=Alt、`#`=Win，如 `HOTKEY := "!e"` 改为 Alt+E |
+| Windows | Ctrl+Shift+E | 改 `PromptBooster.ahk` 末尾的静态热键定义：`^`=Ctrl、`+`=Shift、`!`=Alt、`#`=Win，如 `!e::RunEnhance()` 为 Alt+E |
 
 > 注意：如果快捷键被其他应用占用，注册会失败——日志里会明确提示「快捷键注册失败」，换一个组合即可。
 
