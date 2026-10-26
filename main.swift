@@ -148,9 +148,32 @@ func registerHotKey() {
         : "!! 快捷键注册失败，OSStatus=\(status)（可能被其他应用占用 ⌘⇧E）")
 }
 
-// MARK: - 读取当前选中文本（模拟 Cmd+C）
-func readSelectedText() -> String {
+// MARK: - 读取选中文本
+
+// 方案 A（首选）：通过 Accessibility API 直接读选中文本，不经过剪贴板，
+// 不受 macOS 剪贴板隐私机制影响，也不依赖目标 App 响应模拟按键。
+func readSelectedTextViaAX() -> String? {
+    let sysWide = AXUIElementCreateSystemWide()
+    var focused: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(sysWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+          let el = focused else {
+        log("AX：无法获取焦点元素")
+        return nil
+    }
+    var value: CFTypeRef?
+    let result = AXUIElementCopyAttributeValue(el as! AXUIElement,
+                                               kAXSelectedTextAttribute as CFString, &value)
+    guard result == .success, let text = value as? String, !text.isEmpty else {
+        log("AX：焦点元素不提供选中文本（AXError=\(result.rawValue)）")
+        return nil
+    }
+    return text
+}
+
+// 方案 B（兜底）：模拟 Cmd+C + 轮询剪贴板。
+func readSelectedTextViaClipboard() -> String {
     let pb = NSPasteboard.general
+    let countBefore = pb.changeCount
     pb.clearContents()
     let src = CGEventSource(stateID: .combinedSessionState)
     let down = CGEvent(keyboardEventSource: src, virtualKey: 8, keyDown: true) // C
@@ -159,8 +182,21 @@ func readSelectedText() -> String {
     up?.flags = .maskCommand
     down?.post(tap: .cghidEventTap)
     up?.post(tap: .cghidEventTap)
-    usleep(200_000)
-    return pb.string(forType: .string) ?? ""
+    // 轮询等待目标 App 完成复制（clear 占用一次 changeCount，复制再加一次），最多等 1 秒
+    let deadline = Date().addingTimeInterval(1.0)
+    while Date() < deadline {
+        if pb.changeCount >= countBefore + 2 { break }
+        usleep(50_000)
+    }
+    let text = pb.string(forType: .string) ?? ""
+    if text.isEmpty {
+        log("剪贴板兜底：Cmd+C 后无内容（前台=\(frontmostAppName())，changeCount 增量=\(pb.changeCount - countBefore)）")
+    }
+    return text
+}
+
+func frontmostAppName() -> String {
+    NSWorkspace.shared.frontmostApplication?.localizedName ?? "未知"
 }
 
 // MARK: - 原地替换（模拟 Cmd+V）
@@ -220,11 +256,25 @@ func enhance(_ text: String, completion: @escaping (String?) -> Void) {
 
 // MARK: - 主流程
 func enhanceSelectedText() {
-    let raw = readSelectedText()
-    log("读选区完成，长度=\(raw.count)")
+    log("触发，前台应用：\(frontmostAppName())")
+    // 首选 AX 直读；失败则退回 Cmd+C 剪贴板方案
+    let textViaAX = readSelectedTextViaAX()
+    var raw = ""
+    var source = "无"
+    if let axText = textViaAX {
+        raw = axText
+        source = "AX直读"
+    } else {
+        let clipText = readSelectedTextViaClipboard()
+        if !clipText.isEmpty {
+            raw = clipText
+            source = "剪贴板兜底"
+        }
+    }
+    log("读选区完成，长度=\(raw.count)，来源=\(source)")
     let original = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !original.isEmpty else {
-        log("!! 选区为空（辅助功能可能未授权，或当前应用不支持 Cmd+C 复制）")
+        log("!! 选区为空（未选中文字，或当前应用不支持读取选区）")
         return
     }
 
