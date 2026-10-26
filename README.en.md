@@ -10,8 +10,6 @@ A minimal cross-platform prompt enhancer. Single purpose: enhance already-typed 
 |---|---|---|---|
 | macOS | root | ⌘⇧E | ✅ ready |
 | Windows | `windows/` | Ctrl+Shift+E | ✅ ready |
-| Linux | — | — | deferred |
-| Mobile | — | — | deferred (OS restricts global text selection) |
 
 ## Supported model providers
 
@@ -85,7 +83,7 @@ Defaults are **per-platform** (not identical across platforms):
 | Platform | Default | Customizable | How to change |
 |---|---|---|---|
 | macOS | ⌘⇧E | ✅ yes | edit `HOTKEY_KEYCODE` / `HOTKEY_MODIFIERS` at the top of `main.swift`, then re-run `./install.sh` |
-| Windows | Ctrl+Shift+E | ✅ yes | edit `HOTKEY` at the top of `PromptBooster.ahk`; `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win |
+| Windows | Ctrl+Shift+E | ✅ yes | edit the static hotkey definition at the end of `PromptBooster.ahk`; `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win |
 
 macOS keycodes: `E=14`, `K=40`, `P=35`, etc. Modifiers combine `cmdKey`, `shiftKey`, `optionKey`, `controlKey`.
 
