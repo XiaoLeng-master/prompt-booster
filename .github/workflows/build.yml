@@ -1,0 +1,41 @@
+name: 构建
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 编译（Universal Binary）
+        run: |
+          mkdir -p PromptBooster.app/Contents/MacOS
+          swiftc -O -target arm64-apple-macos12  main.swift -o /tmp/PB-arm64
+          swiftc -O -target x86_64-apple-macos12 main.swift -o /tmp/PB-x86_64
+          lipo -create /tmp/PB-arm64 /tmp/PB-x86_64 -output PromptBooster.app/Contents/MacOS/PromptBooster
+          codesign --force --sign - PromptBooster.app
+
+      - name: 验证产物
+        run: |
+          file PromptBooster.app/Contents/MacOS/PromptBooster
+          plutil -lint PromptBooster.app/Contents/Info.plist
+          codesign --verify --deep PromptBooster.app && echo "签名验证通过"
+
+      - name: 密钥泄漏检查
+        run: |
+          if grep -rnE 'sk-[a-zA-Z0-9]{20,}' --include='*.swift' --include='*.ahk' --include='*.sh' --include='*.json' . ; then
+            echo "!! 检测到疑似真实密钥，禁止合入"
+            exit 1
+          else
+            echo "✓ 无密钥泄漏"
+          fi
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: PromptBooster-macos
+          path: PromptBooster.app

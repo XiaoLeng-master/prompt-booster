@@ -49,6 +49,17 @@
 
 > 想接其他厂商（包括 OpenAI、Claude 等任何 OpenAI 兼容接口），在 `main.swift`（macOS）或 `PromptBooster.ahk`（Windows）的 `LLM_PROVIDERS` / `Providers` 表里加一行——只需平台名和 `chat/completions` 基础地址。
 
+## 环境要求
+
+本工具**没有第三方包依赖**，只需要系统自带或一个免费工具：
+
+| 平台 | 要求 |
+|---|---|
+| macOS 12+ | Xcode 命令行工具（编译用，`xcode-select --install` 免费安装）；Apple Silicon 与 Intel 均支持（Universal Binary） |
+| Windows 10/11 | [AutoHotkey **v2**](https://www.autohotkey.com/)（⚠️ v1 语法不兼容，务必 v2） |
+
+> 本项目不使用 Python / Node，无需 pip / npm 安装任何东西。
+
 ## 安装
 
 ### macOS（3 步）
@@ -169,6 +180,16 @@ rm -rf ~/.prompt-booster  # 删除配置与日志（含密钥）
 ```
 
 Windows：退出托盘进程、删除 `shell:startup` 里的自启项和脚本文件即可。
+
+## 从 Release 下载 .app 的注意事项
+
+如果使用他人（或 CI）编译好的 `.app`（而非自己编译），由于未经 Apple 公证，首次打开可能提示「已损坏」或被 Gatekeeper 拦截。执行一次：
+
+```bash
+xattr -cr /Applications/PromptBooster.app   # 路径按实际安装位置调整
+```
+
+然后正常打开即可。最稳妥的方式始终是**自己源码编译**（`./install.sh`），不经过网络分发二进制。
 
 ## 隐私说明
 

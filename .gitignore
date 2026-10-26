@@ -10,6 +10,6 @@ prompt-booster
 .vscode/
 .idea/
 
-# .app 编译产物
+# .app 只忽略编译出的二进制；Info.plist 等骨架必须进仓库（install.sh 依赖）
 PromptBooster.app/Contents/MacOS/
-*.app
+PromptBooster.app/Contents/_CodeSignature/
