@@ -7,7 +7,6 @@
 #Requires AutoHotkey v2.0
 
 ; ---------- 默认快捷键（可改：^=Ctrl  +=Shift  !=Alt  #=Win）----------
-HOTKEY := "^+e"
 
 ; ---------- 默认模型（无配置时兜底，需配 key 才能用）----------
 DEFAULT_MODEL := "deepseek-chat"
@@ -68,12 +67,12 @@ FORMAT: Provide only the enhanced prompt with no additional commentary.
 )"
 
 UserTemplate(input) {
-    return "
+    template := "
 (
 You are a prompt enhancement assistant. Improve the user prompt while preserving its intent and language.
 
 USER INPUT:
-" input "
+{input}
 
 TASK: Rewrite the user input into a clearer, more specific prompt.
 
@@ -86,6 +85,7 @@ REQUIREMENTS:
 4. Keep complete and concise; no unfinished list or trailing colon.
 5. Do not add unrelated requirements.
 )"
+    return StrReplace(template, "{input}", input)
 }
 
 ; ---------- JSON 字符串转义 / 解析 ----------
@@ -131,7 +131,12 @@ Enhance(text) {
         whr.WaitForResponse()
         if (whr.Status != 200)
             return ""
-        return ExtractContent(whr.ResponseText)
+        raw := whr.ResponseBody
+        n := raw.MaxIndex() + 1
+        buf := Buffer(n)
+        Loop n
+            NumPut("UChar", raw[A_Index - 1], buf, A_Index - 1)
+        return ExtractContent(StrGet(buf, n, "UTF-8"))
     } catch {
         return ""
     }
@@ -157,7 +162,8 @@ RunEnhance() {
         return
     }
     result := Trim(result)
-    result := RegExReplace(result, '^["''“”‘’]+|["''“”‘’]+$', '')
+    qc := Chr(34) Chr(39) Chr(8216) Chr(8217) Chr(8220) Chr(8221)
+    result := RegExReplace(result, "^[" qc "]+|[" qc "]+$", "")
     if (result != "") {
         A_Clipboard := result
         Send "^v"
@@ -167,4 +173,4 @@ RunEnhance() {
 }
 
 ; ---------- 注册热键 ----------
-Hotkey HOTKEY, RunEnhance
+^+e::RunEnhance()
