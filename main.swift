@@ -111,6 +111,23 @@ ENHANCEMENT REQUIREMENTS:
 """
 }
 
+// MARK: - 文件日志（排障用，写入 ~/.prompt-booster/booster.log）
+func log(_ msg: String) {
+    let line = "\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)) \(msg)\n"
+    if let data = line.data(using: .utf8) {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".prompt-booster/booster.log")
+        if let fh = FileHandle(forWritingAtPath: url.path) {
+            fh.seekToEndOfFile()
+            fh.write(data)
+            try? fh.close()
+        } else {
+            try? data.write(to: url)
+        }
+    }
+    NSLog("[PromptBooster] %@", msg)
+}
+
 // MARK: - 全局快捷键回调
 var hotKeyRef: EventHotKeyRef?
 
@@ -118,13 +135,17 @@ func registerHotKey() {
     var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                   eventKind: UInt32(kEventHotKeyPressed))
     InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+        log("快捷键已触发")
         enhanceSelectedText()
         return noErr
     }, 1, &eventType, nil, nil)
 
     let hotKeyID = EventHotKeyID(signature: OSType(0x50424F53), id: 1) // 'PBOS'
-    RegisterEventHotKey(HOTKEY_KEYCODE, HOTKEY_MODIFIERS, hotKeyID,
-                        GetApplicationEventTarget(), 0, &hotKeyRef)
+    let status = RegisterEventHotKey(HOTKEY_KEYCODE, HOTKEY_MODIFIERS, hotKeyID,
+                                     GetApplicationEventTarget(), 0, &hotKeyRef)
+    log(status == noErr
+        ? "快捷键注册成功（⌘⇧E）"
+        : "!! 快捷键注册失败，OSStatus=\(status)（可能被其他应用占用 ⌘⇧E）")
 }
 
 // MARK: - 读取当前选中文本（模拟 Cmd+C）
@@ -199,15 +220,24 @@ func enhance(_ text: String, completion: @escaping (String?) -> Void) {
 
 // MARK: - 主流程
 func enhanceSelectedText() {
-    let original = readSelectedText().trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !original.isEmpty else { return }
+    let raw = readSelectedText()
+    log("读选区完成，长度=\(raw.count)")
+    let original = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !original.isEmpty else {
+        log("!! 选区为空（辅助功能可能未授权，或当前应用不支持 Cmd+C 复制）")
+        return
+    }
 
     enhance(original) { result in
-        guard let result = result else { return }
+        guard let result = result else {
+            log("!! API 调用失败或返回为空")
+            return
+        }
         let cleaned = result.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”‘’"))
         if !cleaned.isEmpty {
             pasteText(cleaned)
+            log("原地替换完成，长度=\(cleaned.count)")
         }
     }
 }
@@ -220,18 +250,18 @@ app.setActivationPolicy(.accessory)
 // 没有此权限，模拟按键会被系统静默拦截（表现为按快捷键无任何反应）。
 let promptOpt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
 if AXIsProcessTrustedWithOptions(promptOpt) {
+    log("启动：辅助功能已授权")
     registerHotKey()
-    print("PromptBooster 已启动，快捷键 ⌘⇧E")
 } else {
+    log("启动：辅助功能未授权，已弹出授权窗，等待用户授权……")
     print("PromptBooster：请在弹出的窗口中授予辅助功能权限（勾选 prompt-booster），授权后自动生效，无需重启。")
     DispatchQueue.global().async {
         while !AXIsProcessTrusted() {
             usleep(1_000_000)
         }
-        NSLog("[PromptBooster] 辅助功能授权成功，注册快捷键")
+        log("辅助功能授权成功，注册快捷键")
         DispatchQueue.main.async {
             registerHotKey()
-            print("PromptBooster 权限已就绪，快捷键 ⌘⇧E")
         }
     }
 }
