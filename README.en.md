@@ -1,6 +1,6 @@
 # PromptBooster
 
-Select text in **any input field** → press a hotkey → it's rewritten in place into a clearer, more specific prompt.
+Select text in a supported input field → press a hotkey → it's rewritten in place into a clearer, more specific prompt.
 
 A minimal cross-platform prompt enhancer. Single purpose: enhance already-typed text into a better prompt. Nothing else. No data collection — your text goes only to the model API you configure, and your key stays on your machine.
 
@@ -82,10 +82,10 @@ Defaults are **per-platform** (not identical across platforms):
 
 | Platform | Default | Customizable | How to change |
 |---|---|---|---|
-| macOS | ⌘⇧E | ✅ yes | edit `HOTKEY_KEYCODE` / `HOTKEY_MODIFIERS` at the top of `main.swift`, then re-run `./install.sh` |
+| macOS | ⌘⇧E | ✅ yes | choose on first launch or use the ✦ menu bar item; use at least two modifiers, including Command, Control, or Option |
 | Windows | Ctrl+Shift+E | ✅ yes | edit the static hotkey definition at the end of `PromptBooster.ahk`; `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win |
 
-macOS keycodes: `E=14`, `K=40`, `P=35`, etc. Modifiers combine `cmdKey`, `shiftKey`, `optionKey`, `controlKey`.
+If the chosen macOS shortcut cannot be registered, the existing shortcut remains active.
 
 ## Install
 
@@ -95,7 +95,7 @@ macOS keycodes: `E=14`, `K=40`, `P=35`, etc. Modifiers combine `cmdKey`, `shiftK
 ./install.sh
 ```
 
-Compiles, generates a config template, sets up launch-at-login. Then: ① fill `api_key` in the config; ② grant Accessibility permission (System Settings → Privacy & Security → Accessibility) — required for in-place replacement.
+Compiles, generates a config template, and launches the app. On first launch, choose a shortcut and whether to launch at login. You can change both later from the ✦ menu bar item. On macOS 13+, the app registers its own login item; macOS 12 users can add the app manually in System Settings. Then: ① fill `api_key` in the config; ② grant Accessibility permission (System Settings → Privacy & Security → Accessibility) — required for in-place replacement.
 
 ### Windows
 
@@ -103,7 +103,7 @@ See [`windows/README.md`](windows/README.md).
 
 ## Uninstall
 
-- macOS: `./uninstall.sh`
+- macOS: `./uninstall.sh` (unregisters the app-managed login item; remove any older manually added login item in System Settings)
 - Windows: stop the AHK process and remove the startup item
 
 ## Logs (macOS)

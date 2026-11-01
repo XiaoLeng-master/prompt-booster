@@ -24,7 +24,7 @@
 - **语言一致**：中文输入出中文、英文出英文、混合保持混合
 - **多模型**：内置多家国内厂商接入，改一行配置即可切换
 - **隐私安全**：密钥存本机，请求直连模型厂商，无中间服务器、无遥测
-- **轻量常驻**：无界面，几 MB 内存占用，开机自启
+- **轻量常驻**：菜单栏显示运行状态；可选择登录时自动启动
 
 ## 支持的平台
 
@@ -72,7 +72,7 @@ cd prompt-booster
 nano ~/.prompt-booster/config.json
 ```
 
-程序会安装到 `~/Applications/PromptBooster.app` 并自动启动。
+程序会安装到 `~/Applications/PromptBooster.app` 并自动启动。首次启动时可选择快捷键（默认 ⌘⇧E）及是否登录时自动启动；以后可从菜单栏 ✦ 修改。
 
 配置内容：
 
@@ -86,7 +86,7 @@ nano ~/.prompt-booster/config.json
 
 **最后一步（必须）**：系统设置 → 隐私与安全性 → 辅助功能 → 点 `+` → 按 `⌘⇧G` 输入 `~/Applications/PromptBooster.app` → 选中 → 打开开关。程序启动时也会主动弹窗提示。
 
-**开机自启（可选）**：系统设置 → 通用 → 登录项与扩展 → 登录时打开 → 点 `+` → 选择 `~/Applications/PromptBooster.app`。
+**登录时自动启动（可选）**：macOS 13+ 在首次引导中选择启用，或从菜单栏 ✦ 切换；若系统要求批准，到系统设置 → 通用 → 登录项与扩展中允许。macOS 12 请手动将 `~/Applications/PromptBooster.app` 加入登录项。拒绝后不会反复弹窗。
 
 > ⚠️ **重要**：每次重新编译后，macOS 的代码签名会变化，**之前的授权会失效**。`install.sh` 已自动处理（重置本应用的授权记录），你只需重新添加并打开开关。如果发现「明明开了还是没反应」，先想到这一条。
 
@@ -139,7 +139,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 }
 ```
 
-改完重启进程生效（macOS：`killall prompt-booster`，launchd 会自动拉起；Windows：退出托盘图标后重新双击脚本）。
+改完重启进程生效（macOS：从菜单栏 ✦ 退出后重新打开 PromptBooster.app；Windows：退出托盘图标后重新双击脚本）。
 
 ## 快捷键
 
@@ -147,10 +147,10 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 
 | 平台 | 默认 | 自定义方法 |
 |---|---|---|
-| macOS | ⌘⇧E | 改 `main.swift` 顶部 `HOTKEY_KEYCODE`（键码：E=14、K=40、P=35…）和 `HOTKEY_MODIFIERS`（`cmdKey` / `shiftKey` / `optionKey` / `controlKey` 组合），重新 `./install.sh` |
+| macOS | ⌘⇧E | 首次引导中录入，或从菜单栏 ✦ →「快捷键」修改；需至少两个修饰键，且包含 ⌘、⌃ 或 ⌥ |
 | Windows | Ctrl+Shift+E | 改 `PromptBooster.ahk` 末尾的静态热键定义：`^`=Ctrl、`+`=Shift、`!`=Alt、`#`=Win，如 `!e::RunEnhance()` 为 Alt+E |
 
-> 注意：如果快捷键被其他应用占用，注册会失败——日志里会明确提示「快捷键注册失败」，换一个组合即可。
+> 注意：如果快捷键被其他应用占用，注册会失败；macOS 版会提示更换组合，原快捷键保持有效。
 
 ## 排障
 
@@ -164,7 +164,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.prompt-booster" | O
 
 | 现象 | 原因与解决 |
 |---|---|
-| 按快捷键完全没反应，日志无「快捷键已触发」 | 快捷键注册失败（被占用）或进程没在跑。查日志首行；macOS 执行 `open -a ~/Applications/PromptBooster.app` 重启 |
+| 按快捷键完全没反应，日志无「快捷键已触发」 | 快捷键注册失败（被占用）或进程没在跑。查菜单栏 ✦ 和日志；macOS 执行 `open -a ~/Applications/PromptBooster.app` 重启 |
 | 日志显示「选区为空」 | 辅助功能未授权，或重新编译后授权失效——移除旧条目重新添加 |
 | 日志显示「API 调用失败」 | 密钥无效 / 余额不足 / 模型名错误。先确认配置正确 |
 | 授权开关明明是开的，还是没反应 | 重编译导致签名变化、授权失效。移除条目 → 重新添加 → 打开 |
@@ -194,6 +194,7 @@ xattr -cr /Applications/PromptBooster.app   # 路径按实际安装位置调整
 - 选中的文字**只发送给你配置的模型厂商**，本工具不经过任何中间服务器
 - 密钥保存在本机配置文件中（建议 `chmod 600`，安装脚本已自动设置）
 - 不上传、不缓存、不遥测
+- 登录时启动只注册快捷键，不读取选区、修改剪贴板或请求模型；只有按快捷键才处理选中文字
 
 ## License
 

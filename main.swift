@@ -1,6 +1,7 @@
 import Cocoa
 import Carbon.HIToolbox
 import Foundation
+import ServiceManagement
 
 // ============================================================
 // PromptBooster (macOS)
@@ -11,10 +12,6 @@ import Foundation
 // ============================================================
 
 // MARK: - 配置（默认值，会被环境变量 / 配置文件覆盖）
-
-// 全局快捷键：⌘⇧E。修改方式见 README「快捷键」章节，或改下面两个常量后重新编译。
-let HOTKEY_KEYCODE: UInt32 = 14 // E 键
-let HOTKEY_MODIFIERS: UInt32 = UInt32(cmdKey | shiftKey)
 
 // 默认模型（无配置时兜底，需配 key 才能用）
 let DEFAULT_MODEL = "deepseek-chat"
@@ -130,8 +127,9 @@ func log(_ msg: String) {
 
 // MARK: - 全局快捷键回调
 var hotKeyRef: EventHotKeyRef?
+var hotKeySequence: UInt32 = 0
 
-func registerHotKey() {
+func installHotKeyHandler() {
     var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                   eventKind: UInt32(kEventHotKeyPressed))
     InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
@@ -139,13 +137,22 @@ func registerHotKey() {
         enhanceSelectedText()
         return noErr
     }, 1, &eventType, nil, nil)
+}
 
-    let hotKeyID = EventHotKeyID(signature: OSType(0x50424F53), id: 1) // 'PBOS'
-    let status = RegisterEventHotKey(HOTKEY_KEYCODE, HOTKEY_MODIFIERS, hotKeyID,
-                                     GetApplicationEventTarget(), 0, &hotKeyRef)
-    log(status == noErr
-        ? "快捷键注册成功（⌘⇧E）"
-        : "!! 快捷键注册失败，OSStatus=\(status)（可能被其他应用占用 ⌘⇧E）")
+func registerHotKey(_ shortcut: Shortcut) -> Bool {
+    hotKeySequence += 1
+    let hotKeyID = EventHotKeyID(signature: OSType(0x50424F53), id: hotKeySequence)
+    var newRef: EventHotKeyRef?
+    let status = RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, hotKeyID,
+                                     GetApplicationEventTarget(), 0, &newRef)
+    guard status == noErr, let newRef else {
+        log("!! 快捷键注册失败，OSStatus=\(status)（\(shortcut.title)）")
+        return false
+    }
+    if let oldRef = hotKeyRef { UnregisterEventHotKey(oldRef) }
+    hotKeyRef = newRef
+    log("快捷键注册成功（\(shortcut.title)）")
+    return true
 }
 
 // MARK: - 读取选中文本
@@ -292,27 +299,213 @@ func enhanceSelectedText() {
     }
 }
 
-// MARK: - 入口
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
+// MARK: - 菜单栏与首次启动
+final class ShortcutRecorder: NSView {
+    var shortcut: Shortcut
+    private let label: NSTextField
 
-// 辅助功能权限检测：没授权时主动弹系统授权窗，并轮询等待授权成功后再注册快捷键。
-// 没有此权限，模拟按键会被系统静默拦截（表现为按快捷键无任何反应）。
-let promptOpt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-if AXIsProcessTrustedWithOptions(promptOpt) {
-    log("启动：辅助功能已授权")
-    registerHotKey()
-} else {
-    log("启动：辅助功能未授权，已弹出授权窗，等待用户授权……")
-    print("PromptBooster：请在弹出的窗口中授予辅助功能权限（勾选 prompt-booster），授权后自动生效，无需重启。")
-    DispatchQueue.global().async {
-        while !AXIsProcessTrusted() {
-            usleep(1_000_000)
-        }
-        log("辅助功能授权成功，注册快捷键")
-        DispatchQueue.main.async {
-            registerHotKey()
+    init(shortcut: Shortcut) {
+        self.shortcut = shortcut
+        label = NSTextField(labelWithString: "快捷键：\(shortcut.title)（点击这里后按新组合）")
+        super.init(frame: NSRect(x: 0, y: 0, width: 350, height: 36))
+        label.frame = bounds.insetBy(dx: 8, dy: 8)
+        addSubview(label)
+        wantsLayer = true
+        layer?.borderWidth = 1
+        layer?.cornerRadius = 5
+        layer?.borderColor = NSColor.separatorColor.cgColor
+    }
+
+    required init?(coder: NSCoder) { nil }
+    override var acceptsFirstResponder: Bool { true }
+    override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self) }
+
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        var modifiers: UInt32 = 0
+        if flags.contains(.command) { modifiers |= UInt32(cmdKey) }
+        if flags.contains(.shift) { modifiers |= UInt32(shiftKey) }
+        if flags.contains(.option) { modifiers |= UInt32(optionKey) }
+        if flags.contains(.control) { modifiers |= UInt32(controlKey) }
+        if let candidate = Shortcut.validated(keyCode: UInt32(event.keyCode), modifiers: modifiers,
+                                               key: event.charactersIgnoringModifiers ?? "") {
+            shortcut = candidate
+            label.stringValue = "快捷键：\(candidate.title)"
+        } else {
+            NSSound.beep()
         }
     }
 }
+
+final class AppController: NSObject, NSMenuDelegate {
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let menu = NSMenu()
+    private let shortcutItem = NSMenuItem()
+    private let loginItem = NSMenuItem()
+    private var shortcut = ShortcutSettings.load()
+
+    func start() {
+        statusItem.button?.title = "✦"
+        shortcutItem.target = self
+        shortcutItem.action = #selector(changeShortcut)
+        menu.addItem(shortcutItem)
+        loginItem.target = self
+        loginItem.action = #selector(toggleLogin)
+        menu.addItem(loginItem)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "退出 PromptBooster", action: #selector(quitApp), keyEquivalent: "")
+        quit.target = self
+        menu.addItem(quit)
+        menu.delegate = self
+        statusItem.menu = menu
+        refreshMenu()
+        installHotKeyHandler()
+
+        DispatchQueue.main.async {
+            if !UserDefaults.standard.bool(forKey: "onboardingCompleted") { self.showOnboarding() }
+            self.startAccessibility()
+        }
+    }
+
+    private func refreshMenu() {
+        shortcutItem.title = "快捷键：\(shortcut.title)…"
+        if #available(macOS 13.0, *) {
+            let status = SMAppService.mainApp.status
+            loginItem.title = status == .requiresApproval ? "登录时自动启动（待系统批准）" : "登录时自动启动"
+            loginItem.state = status == .enabled ? .on : .off
+        } else {
+            loginItem.title = "登录时自动启动（在系统设置中操作）"
+            loginItem.state = .off
+        }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) { refreshMenu() }
+
+    private func showOnboarding() {
+        let alert = NSAlert()
+        alert.messageText = "欢迎使用 PromptBooster"
+        alert.informativeText = "选中文字后按快捷键增强提示词。只有按下快捷键时，文字才会发送到你配置的模型服务。"
+        alert.addButton(withTitle: "保存设置")
+        alert.addButton(withTitle: "稍后设置")
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 350, height: 100))
+        let recorder = ShortcutRecorder(shortcut: shortcut)
+        recorder.frame.origin.y = 62
+        accessory.addSubview(recorder)
+        let login = NSButton(checkboxWithTitle: "登录时自动启动", target: nil, action: nil)
+        login.frame = NSRect(x: 0, y: 31, width: 350, height: 25)
+        accessory.addSubview(login)
+        let hint = NSTextField(labelWithString: "可随时从菜单栏 ✦ 修改；系统权限仍由 macOS 管理。")
+        hint.frame = NSRect(x: 0, y: 0, width: 350, height: 25)
+        accessory.addSubview(hint)
+        alert.accessoryView = accessory
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.makeFirstResponder(recorder)
+        if alert.runModal() == .alertFirstButtonReturn {
+            applyShortcut(recorder.shortcut)
+            if login.state == .on { enableLogin() }
+        }
+        UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+    }
+
+    @objc private func changeShortcut() {
+        let alert = NSAlert()
+        alert.messageText = "选择快捷键"
+        alert.informativeText = "点击输入框后按新的组合键（至少两个修饰键，且包含 ⌘、⌃ 或 ⌥）。"
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "取消")
+        let recorder = ShortcutRecorder(shortcut: shortcut)
+        alert.accessoryView = recorder
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.makeFirstResponder(recorder)
+        if alert.runModal() == .alertFirstButtonReturn { applyShortcut(recorder.shortcut) }
+    }
+
+    private func applyShortcut(_ candidate: Shortcut) {
+        if candidate == shortcut { return }
+        if AXIsProcessTrusted() && !registerHotKey(candidate) {
+            showMessage("快捷键不可用", "\(candidate.title) 可能已被其他程序占用，请换一个组合。原快捷键仍然有效。")
+            return
+        }
+        shortcut = candidate
+        ShortcutSettings.save(candidate)
+        refreshMenu()
+    }
+
+    @objc private func toggleLogin() {
+        if #available(macOS 13.0, *) {
+            switch SMAppService.mainApp.status {
+            case .enabled:
+                do { try SMAppService.mainApp.unregister() }
+                catch { showMessage("无法关闭自动启动", error.localizedDescription) }
+            case .requiresApproval:
+                SMAppService.openSystemSettingsLoginItems()
+            default:
+                enableLogin()
+            }
+        } else {
+            showMessage("请在系统设置中添加", "系统设置 → 通用 → 登录项与扩展 → 登录时打开 → 添加 PromptBooster.app。")
+        }
+        refreshMenu()
+    }
+
+    private func enableLogin() {
+        if #available(macOS 13.0, *) {
+            do {
+                if SMAppService.mainApp.status != .enabled { try SMAppService.mainApp.register() }
+                if SMAppService.mainApp.status == .requiresApproval {
+                    showMessage("需要系统批准", "请在系统设置 → 通用 → 登录项与扩展中允许 PromptBooster。")
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            } catch {
+                showMessage("无法启用自动启动", error.localizedDescription)
+            }
+        } else {
+            showMessage("请在系统设置中添加", "macOS 12 请到系统设置 → 用户与群组 → 登录项中添加 PromptBooster.app。")
+        }
+        refreshMenu()
+    }
+
+    private func startAccessibility() {
+        let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if AXIsProcessTrustedWithOptions(prompt) {
+            log("启动：辅助功能已授权")
+            if !registerHotKey(shortcut) { showMessage("快捷键不可用", "请从菜单栏 ✦ 更换快捷键。") }
+        } else {
+            log("启动：辅助功能未授权，等待用户授权")
+            DispatchQueue.global().async {
+                while !AXIsProcessTrusted() { usleep(1_000_000) }
+                DispatchQueue.main.async {
+                    log("辅助功能授权成功")
+                    if !registerHotKey(self.shortcut) { self.showMessage("快捷键不可用", "请从菜单栏 ✦ 更换快捷键。") }
+                }
+            }
+        }
+    }
+
+    private func showMessage(_ title: String, _ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = detail
+        alert.runModal()
+    }
+
+    @objc private func quitApp() { NSApp.terminate(nil) }
+}
+
+if CommandLine.arguments.contains("--unregister-login") {
+    if #available(macOS 13.0, *) {
+        if SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .requiresApproval {
+            do { try SMAppService.mainApp.unregister() }
+            catch {
+                fputs("无法注销登录项：\(error.localizedDescription)\n", stderr)
+                exit(1)
+            }
+        }
+    }
+    exit(0)
+}
+let app = NSApplication.shared
+app.setActivationPolicy(.accessory)
+let controller = AppController()
+controller.start()
 app.run()

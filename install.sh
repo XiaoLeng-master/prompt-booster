@@ -1,6 +1,6 @@
 #!/bin/bash
 # PromptBooster 安装脚本：编译进 .app 包 + 签名 + 启动
-# 自启方式：系统登录项（系统设置 → 通用 → 登录项），比 LaunchAgent 更简单可靠
+# 首次启动时由应用引导设置快捷键与登录项
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -19,8 +19,9 @@ echo "   swiftc 就绪：$(swiftc --version | head -1)"
 
 echo "==> 1/4 编译进 .app 包（Universal Binary，同时支持 Apple Silicon 与 Intel Mac）"
 TMP_BUILD="$(mktemp -d)"
-swiftc -O -target arm64-apple-macos12  "$DIR/main.swift" -o "$TMP_BUILD/PromptBooster-arm64"
-swiftc -O -target x86_64-apple-macos12 "$DIR/main.swift" -o "$TMP_BUILD/PromptBooster-x86_64"
+swiftc -O -target arm64-apple-macos12  "$DIR/main.swift" "$DIR/Shortcut.swift" -o "$TMP_BUILD/PromptBooster-arm64"
+swiftc -O -target x86_64-apple-macos12 "$DIR/main.swift" "$DIR/Shortcut.swift" -o "$TMP_BUILD/PromptBooster-x86_64"
+mkdir -p "$APP_SRC/Contents/MacOS"
 lipo -create "$TMP_BUILD/PromptBooster-arm64" "$TMP_BUILD/PromptBooster-x86_64" \
      -output "$APP_SRC/Contents/MacOS/PromptBooster"
 rm -rf "$TMP_BUILD"
@@ -61,8 +62,7 @@ echo "      系统设置 → 隐私与安全性 → 辅助功能 → 点 + →"
 echo "      按 ⌘⇧G 输入 ~/Applications/PromptBooster.app → 选中 → 打开开关"
 echo "      （程序启动时也会主动弹授权窗）"
 echo ""
-echo "   ② 开机自启（可选）："
-echo "      系统设置 → 通用 → 登录项与扩展 → 登录时打开 → 点 + →"
-echo "      选择 ~/Applications/PromptBooster.app"
+echo "   ② 在首次启动窗口选择快捷键及是否登录时自动启动。"
+echo "      以后可在菜单栏 ✦ 随时更改。"
 echo ""
 echo "   日志：~/.prompt-booster/booster.log"
