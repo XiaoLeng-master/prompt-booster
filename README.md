@@ -86,6 +86,10 @@ nano ~/.prompt-booster/config.json
 
 **最后一步（必须）**：系统设置 → 隐私与安全性 → 辅助功能 → 点 `+` → 按 `⌘⇧G` 输入 `~/Applications/PromptBooster.app` → 选中 → 打开开关。程序启动时也会主动弹窗提示。
 
+![在 macOS 辅助功能列表中找到 PromptBooster.app](docs/images/macos-accessibility-permission.png)
+
+> 图中红框标出了 PromptBooster.app；截图时开关尚未打开，实际使用前请将右侧开关切换为蓝色。
+
 **登录时自动启动（可选）**：macOS 13+ 在首次引导中选择启用，或从菜单栏 ✦ 切换；若系统要求批准，到系统设置 → 通用 → 登录项与扩展中允许。macOS 12 请手动将 `~/Applications/PromptBooster.app` 加入登录项。拒绝后不会反复弹窗。
 
 > ⚠️ **重要**：每次重新编译后，macOS 的代码签名会变化，**之前的授权会失效**。`install.sh` 已自动处理（重置本应用的授权记录），你只需重新添加并打开开关。如果发现「明明开了还是没反应」，先想到这一条。

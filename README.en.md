@@ -97,6 +97,10 @@ If the chosen macOS shortcut cannot be registered, the existing shortcut remains
 
 Compiles, generates a config template, and launches the app. On first launch, choose a shortcut and whether to launch at login. You can change both later from the ✦ menu bar item. On macOS 13+, the app registers its own login item; macOS 12 users can add the app manually in System Settings. Then: ① fill `api_key` in the config; ② grant Accessibility permission (System Settings → Privacy & Security → Accessibility) — required for in-place replacement.
 
+![Find PromptBooster.app in the macOS Accessibility list](docs/images/macos-accessibility-permission.png)
+
+The screenshot highlights PromptBooster.app before permission is enabled. Turn the switch on so it appears blue before using the hotkey.
+
 ### Windows
 
 See [`windows/README.md`](windows/README.md).
